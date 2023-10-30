@@ -10,6 +10,8 @@ import (
 	"github.com/xqdoo00o/funcaptcha"
 )
 
+var apiBreaker *funcaptcha.ApiBreaker
+
 func main() {
 	r := gin.Default()
 	r.GET("/captcha/start", captchaStart)
@@ -18,11 +20,11 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	endless.ListenAndServe(":"+port, r)
+	endless.ListenAndServe("127.0.0.1:"+port, r)
 }
 
 func captchaStart(c *gin.Context) {
-	token, err := funcaptcha.GetOpenAITokenWithBx(`[{"key":"enhanced_fp","value":[{"key":"navigator_battery_charging","value":true}]},{"key":"fe","value":["DNT:1","L:zh-CN","D:24","PR:1","S:1920,1080","AS:1920,1080","TO:-480","SS:true","LS:true","IDB:true","B:false","ODB:true","CPUC:unknown","PK:Linux x86_64","CFP:11866 se","H:16","SWF:false"]}]`, "", "")
+	token, err := funcaptcha.GetOpenAITokenWithBx(4, `[{"key":"enhanced_fp","value":[{"key":"navigator_battery_charging","value":true}]},{"key":"fe","value":["DNT:1","L:zh-CN","D:24","PR:1","S:1920,1080","AS:1920,1080","TO:-480","SS:true","LS:true","IDB:true","B:false","ODB:true","CPUC:unknown","PK:Linux x86_64","CFP:11866 se","H:16","SWF:false"]}]`, "", "")
 	if err == nil {
 		c.JSON(200, gin.H{"token": token, "status": "success"})
 		return
@@ -37,7 +39,7 @@ func captchaStart(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "unable to log requests"})
 		return
 	}
-	err = session.RequestChallenge(false)
+	apiBreaker, err = session.RequestChallenge(false)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "failed to request challenge"})
 		return
@@ -74,7 +76,7 @@ func captchaVerify(c *gin.Context) {
 		return
 	}
 	// Verify the captcha
-	err := request.Session.SubmitAnswer(request.Index, false)
+	err := request.Session.SubmitAnswer([]int{request.Index}, false, apiBreaker)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return

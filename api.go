@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -40,10 +41,11 @@ var (
 		tls_client.WithNotFollowRedirects(),
 		tls_client.WithCookieJar(jar),
 	}
-	client  *tls_client.HttpClient
-	proxy   = os.Getenv("http_proxy")
-	authArk *arkReq
-	chatArk *arkReq
+	client    *tls_client.HttpClient
+	proxy     = os.Getenv("http_proxy")
+	authArks  []*arkReq
+	chat3Arks []*arkReq
+	chat4Arks []*arkReq
 )
 
 type kvPair struct {
@@ -76,19 +78,42 @@ type HARData struct {
 }
 
 func readHAR() {
-	file, err := os.ReadFile("chat.openai.com.har")
+	// 指定需要读取的文件夹路径
+	dirPath := "./harPool"
+	var harPath []string
+	// 打开文件夹并读取其内容
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// 判断是否为普通文件（非文件夹）
+		if !info.IsDir() {
+			// 获取文件后缀名
+			ext := filepath.Ext(info.Name())
+			if ext == ".har" {
+				harPath = append(harPath, path)
+			}
+		}
+		return nil
+	})
+
 	if err != nil {
-		return
+		println("Error: please put HAR files in harPool directory!")
 	}
-	var harFile HARData
-	err = json.Unmarshal(file, &harFile)
-	if err != nil {
-		println("Error: not a HAR file!")
-		return
-	}
-	for _, v := range harFile.Log.Entries {
-		if strings.HasPrefix(v.Request.URL, arkPreURL) {
-			if authArk == nil || chatArk == nil {
+	for _, path := range harPath {
+		file, err := os.ReadFile(path)
+		if err != nil {
+			return
+		}
+		var harFile HARData
+		err = json.Unmarshal(file, &harFile)
+		if err != nil {
+			println("Error: not a HAR file!")
+			return
+		}
+		for _, v := range harFile.Log.Entries {
+			if strings.HasPrefix(v.Request.URL, arkPreURL) {
 				var tmpArk arkReq
 				tmpArk.arkURL = v.Request.URL
 				if v.StartedDateTime == "" {
@@ -131,13 +156,16 @@ func readHAR() {
 							panic(err)
 						}
 						tmpArk.arkBody.Set(p.Name, query)
-						if p.Name == "site" {
-							if strings.Contains(p.Value, "auth0.") {
-								arkType = "auth"
-								authArk = &tmpArk
-							} else if strings.Contains(p.Value, "chat.") {
+						if p.Name == "site" && strings.Contains(p.Value, "auth0.") {
+							arkType = "auth"
+							authArks = append(authArks, &tmpArk)
+						} else if p.Name == "public_key" {
+							if p.Value == "35536E1E-65B4-4D96-9D97-6ADB7EFF8147" {
 								arkType = "chat"
-								chatArk = &tmpArk
+								chat4Arks = append(chat4Arks, &tmpArk)
+							} else if p.Value == "3D86FBBA-9D22-402A-B512-3420086BA6CC" {
+								arkType = "chat"
+								chat3Arks = append(chat3Arks, &tmpArk)
 							}
 						}
 					}
@@ -147,8 +175,6 @@ func readHAR() {
 				} else {
 					println("failed to decrypt HAR file")
 				}
-			} else {
-				break
 			}
 		}
 	}
@@ -186,13 +212,13 @@ func GetOpenAIAuthTokenWithBx(bx string, puid string, proxy string) (string, err
 	return token, err
 }
 
-func GetOpenAIToken(puid string, proxy string) (string, error) {
-	token, err := sendRequest(1, "", puid, proxy)
+func GetOpenAIToken(version int, puid string, proxy string) (string, error) {
+	token, err := sendRequest(version, "", puid, proxy)
 	return token, err
 }
 
-func GetOpenAITokenWithBx(bx string, puid string, proxy string) (string, error) {
-	token, err := sendRequest(1, getBdaWitBx(bx), puid, proxy)
+func GetOpenAITokenWithBx(version int, bx string, puid string, proxy string) (string, error) {
+	token, err := sendRequest(version, getBdaWitBx(bx), puid, proxy)
 	return token, err
 }
 
@@ -200,9 +226,14 @@ func GetOpenAITokenWithBx(bx string, puid string, proxy string) (string, error) 
 func sendRequest(arkType int, bda string, puid string, proxy string) (string, error) {
 	var tmpArk *arkReq
 	if arkType == 0 {
-		tmpArk = authArk
+		tmpArk = authArks[0]
+		authArks = append(authArks[1:], authArks[0])
+	} else if arkType == 3 {
+		tmpArk = chat3Arks[0]
+		chat3Arks = append(chat3Arks[1:], chat3Arks[0])
 	} else {
-		tmpArk = chatArk
+		tmpArk = chat4Arks[0]
+		chat4Arks = append(chat4Arks[1:], chat4Arks[0])
 	}
 	if tmpArk == nil || tmpArk.arkBx == "" || len(tmpArk.arkBody) == 0 || len(tmpArk.arkHeader) == 0 {
 		return "", errors.New("a valid HAR file required")
@@ -211,7 +242,7 @@ func sendRequest(arkType int, bda string, puid string, proxy string) (string, er
 		(*client).SetProxy(proxy)
 	}
 	if bda == "" {
-		bda = getBDA(arkType)
+		bda = getBDA(tmpArk)
 	}
 	tmpArk.arkBody.Set("bda", base64.StdEncoding.EncodeToString([]byte(bda)))
 	tmpArk.arkBody.Set("rnd", strconv.FormatFloat(rand.Float64(), 'f', -1, 64))
@@ -246,13 +277,8 @@ func sendRequest(arkType int, bda string, puid string, proxy string) (string, er
 }
 
 //goland:noinspection SpellCheckingInspection
-func getBDA(arkType int) string {
-	var bx string
-	if arkType == 0 {
-		bx = authArk.arkBx
-	} else {
-		bx = chatArk.arkBx
-	}
+func getBDA(arkReq *arkReq) string {
+	var bx string = arkReq.arkBx
 	if bx == "" {
 		bx = fmt.Sprintf(bx_template,
 			getF(),
