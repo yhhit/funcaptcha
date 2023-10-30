@@ -21,15 +21,17 @@ import (
 
 const arkPreURL = "https://tcr9i.chat.openai.com/fc/gt2/"
 
+var arkURLIns, _ = url.Parse(arkPreURL)
+
 var initVer, initHex string
 
-var arkCookies []*http.Cookie
-
 type arkReq struct {
-	arkURL    string
-	arkBx     string
-	arkHeader http.Header
-	arkBody   url.Values
+	arkURL     string
+	arkBx      string
+	arkHeader  http.Header
+	arkBody    url.Values
+	arkCookies []*http.Cookie
+	userAgent  string
 }
 
 var (
@@ -86,7 +88,6 @@ func readHAR() {
 		if err != nil {
 			return err
 		}
-
 		// 判断是否为普通文件（非文件夹）
 		if !info.IsDir() {
 			// 获取文件后缀名
@@ -97,7 +98,6 @@ func readHAR() {
 		}
 		return nil
 	})
-
 	if err != nil {
 		println("Error: please put HAR files in harPool directory!")
 	}
@@ -129,15 +129,15 @@ func readHAR() {
 					if !strings.EqualFold(h.Name, "content-length") && !strings.EqualFold(h.Name, "cookie") && !strings.HasPrefix(h.Name, ":") {
 						tmpArk.arkHeader.Set(h.Name, h.Value)
 						if strings.EqualFold(h.Name, "user-agent") {
-							bv = h.Value
+							tmpArk.userAgent = h.Value
 						}
 					}
 				}
-				arkCookies = []*http.Cookie{}
+				tmpArk.arkCookies = []*http.Cookie{}
 				for _, cookie := range v.Request.Cookies {
 					expire, _ := time.Parse(time.RFC3339, cookie.Expires)
 					if expire.After(time.Now()) {
-						arkCookies = append(arkCookies, &http.Cookie{Name: cookie.Name, Value: cookie.Value, Expires: expire.UTC()})
+						tmpArk.arkCookies = append(tmpArk.arkCookies, &http.Cookie{Name: cookie.Name, Value: cookie.Value, Expires: expire.UTC()})
 					}
 				}
 				var arkType string
@@ -149,23 +149,23 @@ func readHAR() {
 						if err != nil {
 							panic(err)
 						}
-						tmpArk.arkBx = Decrypt(cipher, bv+bw, bv+fallbackBw)
+						tmpArk.arkBx = Decrypt(cipher, tmpArk.userAgent+bw, tmpArk.userAgent+fallbackBw)
 					} else if p.Name != "rnd" {
 						query, err := url.QueryUnescape(p.Value)
 						if err != nil {
 							panic(err)
 						}
 						tmpArk.arkBody.Set(p.Name, query)
-						if p.Name == "site" && strings.Contains(p.Value, "auth0.") {
-							arkType = "auth"
-							authArks = append(authArks, &tmpArk)
-						} else if p.Name == "public_key" {
-							if p.Value == "35536E1E-65B4-4D96-9D97-6ADB7EFF8147" {
-								arkType = "chat"
-								chat4Arks = append(chat4Arks, &tmpArk)
-							} else if p.Value == "3D86FBBA-9D22-402A-B512-3420086BA6CC" {
-								arkType = "chat"
+						if p.Name == "public_key" {
+							if query == "0A1D34FC-659D-4E23-B17B-694DCFCF6A6C" {
+								arkType = "auth"
+								authArks = append(authArks, &tmpArk)
+							} else if query == "3D86FBBA-9D22-402A-B512-3420086BA6CC" {
+								arkType = "chat3"
 								chat3Arks = append(chat3Arks, &tmpArk)
+							} else if query == "35536E1E-65B4-4D96-9D97-6ADB7EFF8147" {
+								arkType = "chat4"
+								chat4Arks = append(chat4Arks, &tmpArk)
 							}
 						}
 					}
@@ -178,7 +178,6 @@ func readHAR() {
 			}
 		}
 	}
-
 }
 
 //goland:noinspection GoUnhandledErrorResult
@@ -187,8 +186,6 @@ func init() {
 	initHex = "cd12da708fe6cbe6e068918c38de2ad9" // should be fixed associated with version.
 	readHAR()
 	cli, _ := tls_client.NewHttpClient(tls_client.NewNoopLogger(), options...)
-	u, _ := url.Parse(arkPreURL)
-	cli.GetCookieJar().SetCookies(u, arkCookies)
 	client = &cli
 	if proxy != "" {
 		(*client).SetProxy(proxy)
@@ -197,8 +194,6 @@ func init() {
 
 //goland:noinspection GoUnusedExportedFunction
 func SetTLSClient(cli *tls_client.HttpClient) {
-	u, _ := url.Parse(arkPreURL)
-	(*cli).GetCookieJar().SetCookies(u, arkCookies)
 	client = cli
 }
 
@@ -248,6 +243,7 @@ func sendRequest(arkType int, bda string, puid string, proxy string) (string, er
 	tmpArk.arkBody.Set("rnd", strconv.FormatFloat(rand.Float64(), 'f', -1, 64))
 	req, _ := http.NewRequest(http.MethodPost, tmpArk.arkURL, strings.NewReader(tmpArk.arkBody.Encode()))
 	req.Header = tmpArk.arkHeader.Clone()
+	(*client).GetCookieJar().SetCookies(arkURLIns, tmpArk.arkCookies)
 	if puid != "" {
 		req.Header.Set("cookie", "_puid="+puid+";")
 	}
@@ -314,7 +310,7 @@ func getBDA(arkReq *arkReq) string {
 	}
 	bt := getBt()
 	bw := getBw(bt)
-	return Encrypt(bx, bv+bw)
+	return Encrypt(bx, arkReq.userAgent+bw)
 }
 
 func getBt() int64 {
