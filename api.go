@@ -81,7 +81,7 @@ type HARData struct {
 
 func readHAR() {
 	// 指定需要读取的文件夹路径
-	dirPath := "./harPool"
+	dirPath := "harPool"
 	var harPath []string
 	// 打开文件夹并读取其内容
 	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
