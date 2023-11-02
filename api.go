@@ -221,12 +221,21 @@ func GetOpenAITokenWithBx(version int, bx string, puid string, proxy string) (st
 func sendRequest(arkType int, bda string, puid string, proxy string) (string, error) {
 	var tmpArk *arkReq
 	if arkType == 0 {
+		if len(authArks) == 0 {
+			return "", errors.New("a valid HAR file which contains login arkose is required")
+		}
 		tmpArk = authArks[0]
 		authArks = append(authArks[1:], authArks[0])
 	} else if arkType == 3 {
+		if len(chat3Arks) == 0 {
+			return "", errors.New("a valid HAR file which contains gpt-3.5 arkose is required")
+		}
 		tmpArk = chat3Arks[0]
 		chat3Arks = append(chat3Arks[1:], chat3Arks[0])
 	} else {
+		if len(chat4Arks) == 0 {
+			return "", errors.New("a valid HAR file which contains gpt-4 arkose is required")
+		}
 		tmpArk = chat4Arks[0]
 		chat4Arks = append(chat4Arks[1:], chat4Arks[0])
 	}
