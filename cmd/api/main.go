@@ -7,7 +7,7 @@ import (
 
 	"github.com/acheong08/endless"
 	gin "github.com/gin-gonic/gin"
-	"github.com/xqdoo00o/funcaptcha"
+	"github.com/yhhit/funcaptcha"
 )
 
 var apiBreaker *funcaptcha.ApiBreaker
