@@ -79,7 +79,17 @@ type HARData struct {
 	Log logData `json:"log"`
 }
 
-func readHAR() {
+func readHARFromString(har string){
+	var harData HARData
+	err := json.Unmarshal([]byte(har), &harData)
+	if err != nil {
+		println("Error: not a HAR Text!")
+		return
+	}
+	_readHARFromJson(harData)
+}
+
+func readHARFromFile() {
 	// 指定需要读取的文件夹路径
 	dirPath := "harPool"
 	var harPath []string
@@ -112,69 +122,73 @@ func readHAR() {
 			println("Error: not a HAR file!")
 			return
 		}
-		for _, v := range harFile.Log.Entries {
-			if strings.HasPrefix(v.Request.URL, arkPreURL) {
-				var tmpArk arkReq
-				tmpArk.arkURL = v.Request.URL
-				if v.StartedDateTime == "" {
-					println("Error: no arkose request!")
-					continue
+		_readHARFromJson(harFile)
+	}
+}
+
+func _readHARFromJson(harData HARData){
+	for _, v := range harData.Log.Entries {
+		if strings.HasPrefix(v.Request.URL, arkPreURL) {
+			var tmpArk arkReq
+			tmpArk.arkURL = v.Request.URL
+			if v.StartedDateTime == "" {
+				println("Error: no arkose request!")
+				continue
+			}
+			t, _ := time.Parse(time.RFC3339, v.StartedDateTime)
+			bw := getBw(t.Unix())
+			fallbackBw := getBw(t.Unix() - 21600)
+			tmpArk.arkHeader = make(http.Header)
+			for _, h := range v.Request.Headers {
+				// arkHeader except cookie & content-length
+				if !strings.EqualFold(h.Name, "content-length") && !strings.EqualFold(h.Name, "cookie") && !strings.HasPrefix(h.Name, ":") {
+					tmpArk.arkHeader.Set(h.Name, h.Value)
+					if strings.EqualFold(h.Name, "user-agent") {
+						tmpArk.userAgent = h.Value
+					}
 				}
-				t, _ := time.Parse(time.RFC3339, v.StartedDateTime)
-				bw := getBw(t.Unix())
-				fallbackBw := getBw(t.Unix() - 21600)
-				tmpArk.arkHeader = make(http.Header)
-				for _, h := range v.Request.Headers {
-					// arkHeader except cookie & content-length
-					if !strings.EqualFold(h.Name, "content-length") && !strings.EqualFold(h.Name, "cookie") && !strings.HasPrefix(h.Name, ":") {
-						tmpArk.arkHeader.Set(h.Name, h.Value)
-						if strings.EqualFold(h.Name, "user-agent") {
-							tmpArk.userAgent = h.Value
+			}
+			tmpArk.arkCookies = []*http.Cookie{}
+			for _, cookie := range v.Request.Cookies {
+				expire, _ := time.Parse(time.RFC3339, cookie.Expires)
+				if expire.After(time.Now()) {
+					tmpArk.arkCookies = append(tmpArk.arkCookies, &http.Cookie{Name: cookie.Name, Value: cookie.Value, Expires: expire.UTC()})
+				}
+			}
+			var arkType string
+			tmpArk.arkBody = make(url.Values)
+			for _, p := range v.Request.PostData.Params {
+				// arkBody except bda & rnd
+				if p.Name == "bda" {
+					cipher, err := url.QueryUnescape(p.Value)
+					if err != nil {
+						panic(err)
+					}
+					tmpArk.arkBx = Decrypt(cipher, tmpArk.userAgent+bw, tmpArk.userAgent+fallbackBw)
+				} else if p.Name != "rnd" {
+					query, err := url.QueryUnescape(p.Value)
+					if err != nil {
+						panic(err)
+					}
+					tmpArk.arkBody.Set(p.Name, query)
+					if p.Name == "public_key" {
+						if query == "0A1D34FC-659D-4E23-B17B-694DCFCF6A6C" {
+							arkType = "auth"
+							authArks = append(authArks, &tmpArk)
+						} else if query == "3D86FBBA-9D22-402A-B512-3420086BA6CC" {
+							arkType = "chat3"
+							chat3Arks = append(chat3Arks, &tmpArk)
+						} else if query == "35536E1E-65B4-4D96-9D97-6ADB7EFF8147" {
+							arkType = "chat4"
+							chat4Arks = append(chat4Arks, &tmpArk)
 						}
 					}
 				}
-				tmpArk.arkCookies = []*http.Cookie{}
-				for _, cookie := range v.Request.Cookies {
-					expire, _ := time.Parse(time.RFC3339, cookie.Expires)
-					if expire.After(time.Now()) {
-						tmpArk.arkCookies = append(tmpArk.arkCookies, &http.Cookie{Name: cookie.Name, Value: cookie.Value, Expires: expire.UTC()})
-					}
-				}
-				var arkType string
-				tmpArk.arkBody = make(url.Values)
-				for _, p := range v.Request.PostData.Params {
-					// arkBody except bda & rnd
-					if p.Name == "bda" {
-						cipher, err := url.QueryUnescape(p.Value)
-						if err != nil {
-							panic(err)
-						}
-						tmpArk.arkBx = Decrypt(cipher, tmpArk.userAgent+bw, tmpArk.userAgent+fallbackBw)
-					} else if p.Name != "rnd" {
-						query, err := url.QueryUnescape(p.Value)
-						if err != nil {
-							panic(err)
-						}
-						tmpArk.arkBody.Set(p.Name, query)
-						if p.Name == "public_key" {
-							if query == "0A1D34FC-659D-4E23-B17B-694DCFCF6A6C" {
-								arkType = "auth"
-								authArks = append(authArks, &tmpArk)
-							} else if query == "3D86FBBA-9D22-402A-B512-3420086BA6CC" {
-								arkType = "chat3"
-								chat3Arks = append(chat3Arks, &tmpArk)
-							} else if query == "35536E1E-65B4-4D96-9D97-6ADB7EFF8147" {
-								arkType = "chat4"
-								chat4Arks = append(chat4Arks, &tmpArk)
-							}
-						}
-					}
-				}
-				if tmpArk.arkBx != "" {
-					println("success read " + arkType + " arkose")
-				} else {
-					println("failed to decrypt HAR file")
-				}
+			}
+			if tmpArk.arkBx != "" {
+				println("success read " + arkType + " arkose")
+			} else {
+				println("failed to decrypt HAR file")
 			}
 		}
 	}
@@ -184,7 +198,7 @@ func readHAR() {
 func init() {
 	initVer = "1.5.4"
 	initHex = "cd12da708fe6cbe6e068918c38de2ad9" // should be fixed associated with version.
-	readHAR()
+	readHARFromFile()
 	cli, _ := tls_client.NewHttpClient(tls_client.NewNoopLogger(), options...)
 	client = &cli
 	if proxy != "" {
