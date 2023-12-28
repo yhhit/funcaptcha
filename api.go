@@ -79,7 +79,7 @@ type HARData struct {
 	Log logData `json:"log"`
 }
 
-func readHARFromString(har string){
+func ReadHARFromString(har string){
 	var harData HARData
 	err := json.Unmarshal([]byte(har), &harData)
 	if err != nil {
