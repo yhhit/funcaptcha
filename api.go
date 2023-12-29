@@ -79,7 +79,7 @@ type HARData struct {
 	Log logData `json:"log"`
 }
 
-func ReadHARFromString(har string){
+func ReadHARFromString(har string) {
 	var harData HARData
 	err := json.Unmarshal([]byte(har), &harData)
 	if err != nil {
@@ -126,7 +126,10 @@ func readHARFromFile() {
 	}
 }
 
-func _readHARFromJson(harData HARData){
+func _readHARFromJson(harData HARData) {
+	authArks = []*arkReq{}
+	chat3Arks = []*arkReq{}
+	authArks = []*arkReq{}
 	for _, v := range harData.Log.Entries {
 		if strings.HasPrefix(v.Request.URL, arkPreURL) {
 			var tmpArk arkReq
