@@ -129,7 +129,7 @@ func readHARFromFile() {
 func _readHARFromJson(harData HARData) {
 	authArks = []*arkReq{}
 	chat3Arks = []*arkReq{}
-	authArks = []*arkReq{}
+	chat4Arks = []*arkReq{}
 	for _, v := range harData.Log.Entries {
 		if strings.HasPrefix(v.Request.URL, arkPreURL) {
 			var tmpArk arkReq
