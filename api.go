@@ -17,6 +17,7 @@ import (
 	http "github.com/bogdanfinn/fhttp"
 	tls_client "github.com/bogdanfinn/tls-client"
 	"github.com/bogdanfinn/tls-client/profiles"
+	"github.com/google/uuid"
 )
 
 const arkPreURL = "openai.com/fc/gt2/"
@@ -333,6 +334,9 @@ func getBDA(arkReq *arkReq) string {
 	} else {
 		re := regexp.MustCompile(`"key"\:"n","value"\:"\S*?"`)
 		bx = re.ReplaceAllString(bx, `"key":"n","value":"`+getN()+`"`)
+		newUUID := uuid.NewString()
+		re = regexp.MustCompile(`"key"\:"4b4b269e68","value"\:"\S*?"`)
+		bx = re.ReplaceAllString(bx, `"key":"4b4b269e68","value":"`+newUUID+`"`)
 	}
 	bt := getBt()
 	bw := getBw(bt)
