@@ -21,7 +21,7 @@ import (
 
 const arkPreURL = "openai.com/fc/gt2/"
 
-var arkURLIns, _ = url.Parse("openai.com")
+var arkURLIns, _ = url.Parse("https://openai.com")
 
 var initVer, initHex string
 
