@@ -334,9 +334,13 @@ func getBDA(arkReq *arkReq) string {
 	} else {
 		re := regexp.MustCompile(`"key"\:"n","value"\:"\S*?"`)
 		bx = re.ReplaceAllString(bx, `"key":"n","value":"`+getN()+`"`)
-		newUUID := uuid.NewString()
-		re = regexp.MustCompile(`"key"\:"4b4b269e68","value"\:"\S*?"`)
-		bx = re.ReplaceAllString(bx, `"key":"4b4b269e68","value":"`+newUUID+`"`)
+		re = regexp.MustCompile(`"key"\:"4b4b269e68","value"\:"(\S*?)"`)
+		oldUUID := re.FindStringSubmatch(bx)
+		if len(oldUUID) > 1 {
+			re = regexp.MustCompile(oldUUID[1])
+			newUUID := uuid.NewString()
+			bx = re.ReplaceAllString(bx, newUUID)
+		}
 	}
 	bt := getBt()
 	bw := getBw(bt)
