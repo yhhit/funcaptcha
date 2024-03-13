@@ -19,9 +19,9 @@ import (
 	"github.com/bogdanfinn/tls-client/profiles"
 )
 
-const arkPreURL = "https://tcr9i.chat.openai.com/fc/gt2/"
+const arkPreURL = "openai.com/fc/gt2/"
 
-var arkURLIns, _ = url.Parse(arkPreURL)
+var arkURLIns, _ = url.Parse("openai.com")
 
 var initVer, initHex string
 
@@ -131,7 +131,7 @@ func _readHARFromJson(harData HARData) {
 	chat3Arks = []*arkReq{}
 	chat4Arks = []*arkReq{}
 	for _, v := range harData.Log.Entries {
-		if strings.HasPrefix(v.Request.URL, arkPreURL) {
+		if strings.Contains(v.Request.URL, arkPreURL) {
 			var tmpArk arkReq
 			tmpArk.arkURL = v.Request.URL
 			if v.StartedDateTime == "" {
