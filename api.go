@@ -236,7 +236,7 @@ func GetOpenAITokenWithBx(version int, bx string, puid string, proxy string) (st
 }
 
 //goland:noinspection SpellCheckingInspection,GoUnhandledErrorResult
-func sendRequest(arkType int, bda string, puid string, proxy string) (string, error) {
+func sendRequest(arkType int, unusebda string, puid string, proxy string) (string, error) {
 	var tmpArk *arkReq
 	if arkType == 0 {
 		if len(authArks) == 0 {
@@ -263,13 +263,12 @@ func sendRequest(arkType int, bda string, puid string, proxy string) (string, er
 	if proxy != "" {
 		(*client).SetProxy(proxy)
 	}
-	if bda == "" {
-		bda = getBDA(tmpArk)
-	}
+	bda, bw := getBDA(tmpArk)
 	tmpArk.arkBody.Set("bda", base64.StdEncoding.EncodeToString([]byte(bda)))
 	tmpArk.arkBody.Set("rnd", strconv.FormatFloat(rand.Float64(), 'f', -1, 64))
 	req, _ := http.NewRequest(http.MethodPost, tmpArk.arkURL, strings.NewReader(tmpArk.arkBody.Encode()))
 	req.Header = tmpArk.arkHeader.Clone()
+	req.Header.Set("X-Ark-Esync-Value", bw)
 	(*client).GetCookieJar().SetCookies(arkURLIns, tmpArk.arkCookies)
 	if puid != "" {
 		req.Header.Set("cookie", "_puid="+puid+";")
@@ -300,7 +299,7 @@ func sendRequest(arkType int, bda string, puid string, proxy string) (string, er
 }
 
 //goland:noinspection SpellCheckingInspection
-func getBDA(arkReq *arkReq) string {
+func getBDA(arkReq *arkReq) (string, string) {
 	var bx string = arkReq.arkBx
 	if bx == "" {
 		bx = fmt.Sprintf(bx_template,
@@ -344,11 +343,11 @@ func getBDA(arkReq *arkReq) string {
 	}
 	bt := getBt()
 	bw := getBw(bt)
-	return Encrypt(bx, arkReq.userAgent+bw)
+	return Encrypt(bx, arkReq.userAgent+bw), bw
 }
 
 func getBt() int64 {
-	return time.Now().UnixMicro() / 1000000
+	return time.Now().Unix()
 }
 
 func getBw(bt int64) string {

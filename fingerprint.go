@@ -19,7 +19,7 @@ func getF() string {
 }
 
 func getN() string {
-	timestamp := fmt.Sprintf("%d", time.Now().UnixNano()/1000000000)
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
 	return base64.StdEncoding.EncodeToString([]byte(timestamp))
 }
 
