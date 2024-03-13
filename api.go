@@ -44,11 +44,10 @@ var (
 		tls_client.WithNotFollowRedirects(),
 		tls_client.WithCookieJar(jar),
 	}
-	client    *tls_client.HttpClient
-	proxy     = os.Getenv("http_proxy")
-	authArks  []*arkReq
-	chat3Arks []*arkReq
-	chat4Arks []*arkReq
+	client   *tls_client.HttpClient
+	proxy    = os.Getenv("http_proxy")
+	authArks []*arkReq
+	chatArks []*arkReq
 )
 
 type kvPair struct {
@@ -129,8 +128,7 @@ func readHARFromFile() {
 
 func _readHARFromJson(harData HARData) {
 	authArks = []*arkReq{}
-	chat3Arks = []*arkReq{}
-	chat4Arks = []*arkReq{}
+	chatArks = []*arkReq{}
 	for _, v := range harData.Log.Entries {
 		if strings.Contains(v.Request.URL, arkPreURL) {
 			var tmpArk arkReq
@@ -179,12 +177,9 @@ func _readHARFromJson(harData HARData) {
 						if query == "0A1D34FC-659D-4E23-B17B-694DCFCF6A6C" {
 							arkType = "auth"
 							authArks = append(authArks, &tmpArk)
-						} else if query == "3D86FBBA-9D22-402A-B512-3420086BA6CC" {
-							arkType = "chat3"
-							chat3Arks = append(chat3Arks, &tmpArk)
 						} else if query == "35536E1E-65B4-4D96-9D97-6ADB7EFF8147" {
-							arkType = "chat4"
-							chat4Arks = append(chat4Arks, &tmpArk)
+							arkType = "chat"
+							chatArks = append(chatArks, &tmpArk)
 						}
 					}
 				}
@@ -244,18 +239,12 @@ func sendRequest(arkType int, unusebda string, puid string, proxy string) (strin
 		}
 		tmpArk = authArks[0]
 		authArks = append(authArks[1:], authArks[0])
-	} else if arkType == 3 {
-		if len(chat3Arks) == 0 {
-			return "", errors.New("a valid HAR file which contains gpt-3.5 arkose is required")
-		}
-		tmpArk = chat3Arks[0]
-		chat3Arks = append(chat3Arks[1:], chat3Arks[0])
-	} else {
-		if len(chat4Arks) == 0 {
+		} else if arkType == 3 || arkType == 4 {
+			if len(chatArks) == 0 {
 			return "", errors.New("a valid HAR file which contains gpt-4 arkose is required")
 		}
-		tmpArk = chat4Arks[0]
-		chat4Arks = append(chat4Arks[1:], chat4Arks[0])
+		tmpArk = chatArks[0]
+		chatArks = append(chatArks[1:], chatArks[0])
 	}
 	if tmpArk == nil || tmpArk.arkBx == "" || len(tmpArk.arkBody) == 0 || len(tmpArk.arkHeader) == 0 {
 		return "", errors.New("a valid HAR file required")
