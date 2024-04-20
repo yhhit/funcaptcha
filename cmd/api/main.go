@@ -24,7 +24,7 @@ func main() {
 }
 
 func captchaStart(c *gin.Context) {
-	token, err := funcaptcha.GetOpenAITokenWithBx(4, `[{"key":"enhanced_fp","value":[{"key":"navigator_battery_charging","value":true}]},{"key":"fe","value":["DNT:1","L:zh-CN","D:24","PR:1","S:1920,1080","AS:1920,1080","TO:-480","SS:true","LS:true","IDB:true","B:false","ODB:true","CPUC:unknown","PK:Linux x86_64","CFP:11866 se","H:16","SWF:false"]}]`, "", "")
+	token, err := funcaptcha.GetOpenAITokenWithBx(4, `[{"key":"enhanced_fp","value":[{"key":"navigator_battery_charging","value":true}]},{"key":"fe","value":["DNT:1","L:zh-CN","D:24","PR:1","S:1920,1080","AS:1920,1080","TO:-480","SS:true","LS:true","IDB:true","B:false","ODB:true","CPUC:unknown","PK:Linux x86_64","CFP:11866 se","H:16","SWF:false"]}]`, "", "", "")
 	if err == nil {
 		c.JSON(200, gin.H{"token": token, "status": "success"})
 		return

@@ -210,28 +210,28 @@ func SetTLSClient(cli *tls_client.HttpClient) {
 	client = cli
 }
 
-func GetOpenAIAuthToken(puid string, proxy string) (string, error) {
-	token, err := sendRequest(0, "", puid, proxy)
+func GetOpenAIAuthToken(puid string, dx string, proxy string) (string, error) {
+	token, err := sendRequest(0, "", puid, dx, proxy)
 	return token, err
 }
 
-func GetOpenAIAuthTokenWithBx(bx string, puid string, proxy string) (string, error) {
-	token, err := sendRequest(0, getBdaWitBx(bx), puid, proxy)
+func GetOpenAIAuthTokenWithBx(bx string, puid string, dx string, proxy string) (string, error) {
+	token, err := sendRequest(0, getBdaWitBx(bx), puid, dx, proxy)
 	return token, err
 }
 
-func GetOpenAIToken(version int, puid string, proxy string) (string, error) {
-	token, err := sendRequest(version, "", puid, proxy)
+func GetOpenAIToken(version int, puid string, dx string, proxy string) (string, error) {
+	token, err := sendRequest(version, "", puid, dx, proxy)
 	return token, err
 }
 
-func GetOpenAITokenWithBx(version int, bx string, puid string, proxy string) (string, error) {
-	token, err := sendRequest(version, getBdaWitBx(bx), puid, proxy)
+func GetOpenAITokenWithBx(version int, bx string, puid string, dx string, proxy string) (string, error) {
+	token, err := sendRequest(version, getBdaWitBx(bx), puid, dx, proxy)
 	return token, err
 }
 
 //goland:noinspection SpellCheckingInspection,GoUnhandledErrorResult
-func sendRequest(arkType int, unusebda string, puid string, proxy string) (string, error) {
+func sendRequest(arkType int, unusebda string, puid string, dx string, proxy string) (string, error) {
 	var tmpArk *arkReq
 	if arkType == 0 {
 		if len(authArks) == 0 {
@@ -255,12 +255,15 @@ func sendRequest(arkType int, unusebda string, puid string, proxy string) (strin
 	bda, bw := getBDA(tmpArk)
 	tmpArk.arkBody.Set("bda", base64.StdEncoding.EncodeToString([]byte(bda)))
 	tmpArk.arkBody.Set("rnd", strconv.FormatFloat(rand.Float64(), 'f', -1, 64))
+	if dx != "" {
+		tmpArk.arkBody.Set("data[blob]", dx)
+	}
 	req, _ := http.NewRequest(http.MethodPost, tmpArk.arkURL, strings.NewReader(tmpArk.arkBody.Encode()))
 	req.Header = tmpArk.arkHeader.Clone()
 	req.Header.Set("X-Ark-Esync-Value", bw)
 	(*client).GetCookieJar().SetCookies(arkURLIns, tmpArk.arkCookies)
 	if puid != "" {
-		req.Header.Set("cookie", "_puid="+puid+";")
+		req.Header.Set("Cookie", "_puid="+puid+";")
 	}
 	resp, err := (*client).Do(req)
 	if err != nil {
