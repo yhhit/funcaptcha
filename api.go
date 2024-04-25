@@ -89,6 +89,11 @@ func ReadHARFromString(har string) {
 	_readHARFromJson(harData)
 }
 
+func ClearHar() {
+	authArks = []*arkReq{}
+	chatArks = []*arkReq{}
+}
+
 func readHARFromFile() {
 	// 指定需要读取的文件夹路径
 	dirPath := "harPool"
@@ -127,8 +132,6 @@ func readHARFromFile() {
 }
 
 func _readHARFromJson(harData HARData) {
-	authArks = []*arkReq{}
-	chatArks = []*arkReq{}
 	for _, v := range harData.Log.Entries {
 		if strings.Contains(v.Request.URL, arkPreURL) {
 			var tmpArk arkReq
@@ -239,8 +242,8 @@ func sendRequest(arkType int, unusebda string, puid string, dx string, proxy str
 		}
 		tmpArk = authArks[0]
 		authArks = append(authArks[1:], authArks[0])
-		} else if arkType == 3 || arkType == 4 {
-			if len(chatArks) == 0 {
+	} else if arkType == 3 || arkType == 4 {
+		if len(chatArks) == 0 {
 			return "", errors.New("a valid HAR file which contains gpt-4 arkose is required")
 		}
 		tmpArk = chatArks[0]
