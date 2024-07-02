@@ -296,10 +296,11 @@ func sendRequest(arkType int, unusebda string, puid string, dx string, proxy str
 //goland:noinspection SpellCheckingInspection
 func getBDA(arkReq *arkReq) (string, string) {
 	var bx string = arkReq.arkBx
+	var t = time.Now()
 	if bx == "" {
 		bx = fmt.Sprintf(bx_template,
 			getF(),
-			getN(),
+			getN(t),
 			getWh(),
 			webglExtensions,
 			getWebglExtensionsHash(),
@@ -327,7 +328,9 @@ func getBDA(arkReq *arkReq) (string, string) {
 		)
 	} else {
 		re := regexp.MustCompile(`"key"\:"n","value"\:"\S*?"`)
-		bx = re.ReplaceAllString(bx, `"key":"n","value":"`+getN()+`"`)
+		bx = re.ReplaceAllString(bx, `"key":"n","value":"`+getN(t)+`"`)
+		re = regexp.MustCompile(`"key"\:"1l2l5234ar2","value"\:"\S*?"`)
+		bx = re.ReplaceAllString(bx, `"key":"1l2l5234ar2","value":"`+fmt.Sprintf("%d", t.UnixMilli())+"\u2062\"")
 		re = regexp.MustCompile(`"key"\:"4b4b269e68","value"\:"(\S*?)"`)
 		oldUUID := re.FindStringSubmatch(bx)
 		if len(oldUUID) > 1 {
@@ -336,8 +339,7 @@ func getBDA(arkReq *arkReq) (string, string) {
 			bx = re.ReplaceAllString(bx, newUUID)
 		}
 	}
-	bt := getBt()
-	bw := getBw(bt)
+	bw := getBw(t.Unix())
 	return Encrypt(bx, arkReq.userAgent+bw), bw
 }
 

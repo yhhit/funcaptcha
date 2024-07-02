@@ -18,8 +18,8 @@ func getF() string {
 	return getMurmur128String(strings.Join(res, "~~~"), 31)
 }
 
-func getN() string {
-	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+func getN(t time.Time) string {
+	timestamp := fmt.Sprintf("%d", t.Unix())
 	return base64.StdEncoding.EncodeToString([]byte(timestamp))
 }
 
